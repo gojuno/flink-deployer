@@ -2,20 +2,24 @@ package main
 
 import (
 	"fmt"
+	"github.com/hashicorp/go-retryablehttp"
 	"log"
 	"net/http"
 	"os"
 	"strconv"
 	"time"
 
-	"github.com/hashicorp/go-retryablehttp"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/service/s3"
+
+	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/ing-bank/flink-deployer/cmd/cli/flink"
 	"github.com/ing-bank/flink-deployer/cmd/cli/operations"
 	"github.com/spf13/afero"
 	"github.com/urfave/cli"
 )
 
-var filesystem afero.Fs
 var operator operations.Operator
 
 // ListAction executes the CLI list command
@@ -175,6 +179,16 @@ func getAPITimeoutSeconds() (int64, error) {
 	return int64(10), nil
 }
 
+func getOSEnv(name string) (value string) {
+	value = os.Getenv("FLINK_BASE_URL")
+	if len(value) == 0 {
+		log.Fatalf("%q environment variable not found", name)
+		os.Exit(1)
+	}
+
+	return value
+}
+
 func main() {
 	flinkBaseURL := os.Getenv("FLINK_BASE_URL")
 	if len(flinkBaseURL) == 0 {
@@ -193,8 +207,19 @@ func main() {
 		Timeout: time.Second * time.Duration(flinkAPITimeoutSeconds),
 	}
 
+	awsConfig := aws.Config{
+		Region:      aws.String(getOSEnv("AWS_REGION")),
+		Credentials: credentials.NewStaticCredentials(getOSEnv("AWS_ACCESS_KEY_ID"), getOSEnv("AWS_SECRET_ACCESS_KEY"), ""),
+	}
+	awsSession, err := session.NewSession(&awsConfig)
+	if err != nil {
+		log.Fatalf("failed to initiate aws session with cofngi %+v: %v", awsConfig, err)
+		os.Exit(1)
+	}
+
 	operator = operations.RealOperator{
 		Filesystem: afero.NewOsFs(),
+		S3Client:   s3.New(awsSession),
 		FlinkRestAPI: flink.FlinkRestClient{
 			BaseURL: flinkBaseURL,
 			Client:  client,

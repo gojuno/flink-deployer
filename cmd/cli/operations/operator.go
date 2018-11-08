@@ -1,6 +1,7 @@
 package operations
 
 import (
+	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/ing-bank/flink-deployer/cmd/cli/flink"
 	"github.com/spf13/afero"
 )
@@ -16,5 +17,6 @@ type Operator interface {
 // RealOperator is the Operator used in the production code
 type RealOperator struct {
 	Filesystem   afero.Fs
+	S3Client     *s3.S3
 	FlinkRestAPI flink.FlinkRestAPI
 }
