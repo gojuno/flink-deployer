@@ -2,15 +2,13 @@ package operations
 
 import (
 	"errors"
+	"fmt"
 	"net/url"
-	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/s3"
-
-	"github.com/spf13/afero"
 )
 
 func (o RealOperator) retrieveLatestSavepoint(dir string) (string, error) {
@@ -27,6 +25,9 @@ func (o RealOperator) retrieveLatestSavepoint(dir string) (string, error) {
 		Bucket: aws.String(u.Host),
 		Prefix: aws.String(u.Path),
 	})
+	if err != nil {
+		return "", fmt.Errorf("failed to load objects from s3 %q: %v", dir, err)
+	}
 
 	if len(output.Contents) == 0 {
 		return "", errors.New("No savepoints present in directory: " + dir)
@@ -46,16 +47,4 @@ func (o RealOperator) retrieveLatestSavepoint(dir string) (string, error) {
 	}
 
 	return newestFile, nil
-}
-
-type Filesystem interface {
-	ReadDir(dir string) ([]os.FileInfo, error)
-}
-
-type LocalFs struct {
-	client afero.Fs
-}
-
-func (fs *LocalFs) ReadDir(dir string) ([]os.FileInfo, error) {
-	return afero.ReadDir(fs.client, dir)
 }
